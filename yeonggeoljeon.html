@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>삼국지 영걸전 - 황건적의 난</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#1a140e;
+    color:#e8dcc0;
+    font-family:'Noto Sans KR','Malgun Gothic',sans-serif;
+    min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:10px;
+  }
+  h1 {
+    font-size:26px; color:#e3b341; letter-spacing:4px;
+    text-shadow:2px 2px 0 #000; margin:6px 0 2px;
+  }
+  .subtitle { font-size:13px; color:#a89878; margin-bottom:8px; }
+  #gameArea { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  #canvasWrap { position:relative; }
+  canvas {
+    background:#000; border:3px solid #6b5a3e; border-radius:6px;
+    display:block; max-width:100%; height:auto;
+    cursor:pointer; touch-action:manipulation;
+  }
+  /* ---- 행동 메뉴 ---- */
+  #actionMenu {
+    position:absolute; display:none; z-index:20;
+    background:#2a2018; border:2px solid #e3b341; border-radius:8px;
+    padding:6px; box-shadow:0 4px 12px rgba(0,0,0,.6);
+  }
+  #actionMenu button {
+    display:block; width:90px; margin:4px 0; padding:7px 0;
+    background:#4a3a26; color:#f0e6d0; border:1px solid #8a7450;
+    border-radius:5px; font-size:14px; font-weight:bold; cursor:pointer;
+    font-family:inherit;
+  }
+  #actionMenu button:hover:not(:disabled) { background:#6b5435; }
+  #actionMenu button:disabled { opacity:.35; cursor:default; }
+  /* ---- 사이드 패널 ---- */
+  #panel {
+    width:250px; background:#241c12; border:3px solid #6b5a3e; border-radius:6px;
+    padding:12px; display:flex; flex-direction:column; gap:10px; font-size:13px;
+  }
+  .panelBox { background:#1a140c; border:1px solid #4a3c28; border-radius:5px; padding:8px; }
+  .panelTitle { color:#e3b341; font-weight:bold; font-size:12px; margin-bottom:5px; letter-spacing:1px; }
+  #turnInfo { font-size:15px; font-weight:bold; text-align:center; }
+  #turnInfo .phase-player { color:#7ab8ff; }
+  #turnInfo .phase-enemy { color:#ff8a7a; }
+  .statRow { display:flex; justify-content:space-between; padding:1px 0; }
+  .statRow .v { color:#fff; font-weight:bold; }
+  .hpbarOuter { background:#3a2f20; border-radius:3px; height:10px; margin:4px 0; overflow:hidden; }
+  .hpbarInner { height:100%; background:linear-gradient(#7ae07a,#3da33d); transition:width .3s; }
+  .expbarInner { height:100%; background:linear-gradient(#e8d27a,#bfa238); transition:width .3s; }
+  #log {
+    height:130px; overflow-y:auto; font-size:12px; line-height:1.55; color:#cbbfa4;
+  }
+  #log .important { color:#e3b341; font-weight:bold; }
+  #log .dmg { color:#ff9a8a; }
+  #log .heal { color:#8ae09a; }
+  #endTurnBtn {
+    padding:10px; background:#7a2a20; color:#ffe8c8; border:2px solid #c8694f;
+    border-radius:6px; font-size:15px; font-weight:bold; cursor:pointer; font-family:inherit;
+    letter-spacing:2px;
+  }
+  #endTurnBtn:hover:not(:disabled) { background:#9a3a2a; }
+  #endTurnBtn:disabled { opacity:.4; cursor:default; }
+  .hint { font-size:11px; color:#8a7a5e; line-height:1.5; }
+  /* ---- 오버레이 (타이틀/클리어/패배) ---- */
+  #overlay {
+    position:fixed; inset:0; background:rgba(8,5,2,.88); z-index:50;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #overlayBox {
+    max-width:560px; width:92%; background:#241a0e; border:3px solid #e3b341;
+    border-radius:10px; padding:30px 26px; text-align:center;
+    box-shadow:0 0 40px rgba(227,179,65,.25);
+  }
+  #overlayBox h2 { color:#e3b341; font-size:30px; letter-spacing:6px; margin-bottom:6px; text-shadow:2px 2px 0 #000; }
+  #overlayBox h3 { color:#f0e0b0; font-size:18px; margin-bottom:14px; }
+  #overlayBox p { color:#cbbfa4; font-size:14px; line-height:1.8; margin-bottom:18px; white-space:pre-line; }
+  #overlayBox button {
+    padding:12px 38px; background:#7a2a20; color:#ffe8c8; border:2px solid #c8694f;
+    border-radius:6px; font-size:17px; font-weight:bold; cursor:pointer; font-family:inherit; letter-spacing:3px;
+  }
+  #overlayBox button:hover { background:#9a3a2a; }
+  @media (max-width:1000px){ #panel { width:100%; max-width:672px; } }
+</style>
+</head>
+<body>
+<h1>三國志 영걸전</h1>
+<div class="subtitle">~ 황건적의 난 ~</div>
+
+<div id="gameArea">
+  <div id="canvasWrap">
+    <canvas id="game" width="672" height="480"></canvas>
+    <div id="actionMenu">
+      <button id="btnAttack">⚔️ 공격</button>
+      <button id="btnWait">⏳ 대기</button>
+      <button id="btnCancel">↩️ 취소</button>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div class="panelBox" id="turnInfo">제1장 / 1턴 <span class="phase-player">아군 차례</span></div>
+
+    <div class="panelBox">
+      <div class="panelTitle">📋 부대 정보</div>
+      <div id="unitInfo"><span class="hint">유닛 위에 마우스를 올리거나 클릭하세요.</span></div>
+    </div>
+
+    <div class="panelBox">
+      <div class="panelTitle">🗺️ 지형</div>
+      <div id="tileInfo"><span class="hint">-</span></div>
+    </div>
+
+    <div class="panelBox">
+      <div class="panelTitle">📜 전황</div>
+      <div id="log"></div>
+    </div>
+
+    <button id="endTurnBtn">턴 종료 ▶</button>
+    <div class="hint">
+      아군(파랑)을 클릭 → 이동할 칸 클릭 → 공격/대기 선택.<br>
+      우클릭 또는 빈 곳 클릭으로 취소. 성채(🏯)에 서면 매 턴 회복.
+    </div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="overlayBox">
+    <h2>三國志 영걸전</h2>
+    <h3>~ 황건적의 난 ~</h3>
+    <p>때는 후한 말, 장각이 이끄는 황건적이 천하를 어지럽히니
+유비 · 관우 · 장비 세 사람이 도원에서 의형제를 맺고
+의병을 일으켜 난세에 뛰어드는데——</p>
+    <button id="overlayBtn">출진!</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   삼국지 영걸전 (팬게임) - 턴제 전술 SRPG
+   ========================================================= */
+const TS = 48;                 // 타일 크기(px)
+const COLS = 14, ROWS = 10;
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+/* ---------------- 지형 ---------------- */
+const TERRAIN = {
+  P: { name:'평지',  def:0, emoji:'',    color:'#7da453' },
+  F: { name:'숲',    def:1, emoji:'🌲', color:'#4f7a3a' },
+  M: { name:'산',    def:2, emoji:'⛰️', color:'#8a7a62' },
+  W: { name:'강',    def:0, emoji:'🌊', color:'#3a6ea5' },
+  T: { name:'성채',  def:2, emoji:'🏯', color:'#c2a878' },
+  B: { name:'다리',  def:0, emoji:'',    color:'#9a7a4a' },
+};
+
+/* ---------------- 병종 ---------------- */
+const CLASSES = {
+  보병:   { emoji:'🗡️', minR:1, maxR:1, magic:false, cost:{P:1,F:2,M:3,T:1,B:1} },
+  기병:   { emoji:'🐎',  minR:1, maxR:1, magic:false, cost:{P:1,F:3,    T:1,B:1} },
+  궁병:   { emoji:'🏹',  minR:1, maxR:2, magic:false, cost:{P:1,F:2,M:3,T:1,B:1} },
+  적장:   { emoji:'👹',  minR:1, maxR:1, magic:false, cost:{P:1,F:2,M:3,T:1,B:1} },
+  요술사: { emoji:'🔮',  minR:1, maxR:2, magic:true,  cost:{P:1,F:2,M:3,T:1,B:1} },
+};
+
+/* ---------------- 아군 명부 (장 사이에 성장 유지) ---------------- */
+function makeHero(name, cls, hp, atk, def, mov, opts={}) {
+  return { name, cls, faction:'player', level:1, exp:0,
+           maxHp:hp, hp, atk, def, mov, joined:opts.joined||1,
+           leader:!!opts.leader, alive:true, acted:false,
+           x:0, y:0, rx:0, ry:0 };
+}
+let roster = [];
+function buildRoster() {
+  roster = [
+    makeHero('유비',     '보병', 36, 12, 6, 4, { leader:true }),
+    makeHero('관우',     '보병', 40, 15, 8, 4),
+    makeHero('장비',     '보병', 42, 16, 6, 4),
+    makeHero('의용궁수', '궁병', 30, 11, 4, 4),
+    makeHero('조운',     '기병', 38, 14, 7, 6, { joined:2 }),
+  ];
+}
+
+/* ---------------- 스테이지 ---------------- */
+function foe(name, cls, x, y, hp, atk, def, mov, opts={}) {
+  return { name, cls, faction:'enemy', level:opts.lv||1, exp:0,
+           maxHp:hp, hp, atk, def, mov,
+           boss:!!opts.boss, aggroR:opts.aggroR??7,
+           alive:true, acted:false, x, y, rx:x, ry:y };
+}
+const STAGES = [
+  {
+    title:'제1장 도원결의 - 탁군 전투',
+    intro:'탁군 인근에 황건적 일당이 나타나 마을을 약탈하고 있다.\n적장 정원지를 토벌하여 의병의 첫 무명(武名)을 떨쳐라!',
+    map:[
+      'PPPPPFFPPPPPPP',
+      'PPPPPFFPPPMMPP',
+      'PPPPPPPPPPMMPP',
+      'PPPPPPPPPPPPPP',
+      'WWWWWBBWWWWWWW',
+      'PPPPPPPPPPPPPP',
+      'PPFFPPPPPPPPPP',
+      'PPFFPPPPPTPPPP',
+      'PPPPPPPPPPPPPP',
+      'PPPPPPPPPPPPPP',
+    ],
+    spawns:[[5,8],[4,8],[6,8],[5,9],[3,8]],
+    enemies:() => [
+      foe('정원지','적장', 6,1, 34,13,5,4, { boss:true, aggroR:5 }),
+      foe('황건적병','보병', 4,2, 24, 9,3,4),
+      foe('황건적병','보병', 8,2, 24, 9,3,4),
+      foe('황건적병','보병', 5,0, 24, 9,3,4),
+      foe('황건적병','보병', 9,3, 24, 9,3,4),
+      foe('황건궁병','궁병', 6,3, 22, 9,2,4),
+    ],
+  },
+  {
+    title:'제2장 영천 전투',
+    intro:'황건의 세력이 영천까지 미치니, 지공장군 장보가 산채에 웅거한다.\n새로 합류한 조운과 함께 적진을 돌파하라!',
+    map:[
+      'MMPPPPPPPPPPMM',
+      'MMPPPTPPPPPPMM',
+      'MPPPPPPPPPPPPM',
+      'PPPFFPPPPFFPPP',
+      'PPPFFPPPPFFPPP',
+      'PPPPPPPPPPPPPP',
+      'PPPPPPPPPPPPPP',
+      'MPPPPPPPPPPPPM',
+      'MMPPPPPPPPPPMM',
+      'MMPPPPPPPPPPMM',
+    ],
+    spawns:[[6,8],[5,8],[7,8],[6,9],[4,8]],
+    enemies:() => [
+      foe('장보','요술사', 5,1, 40,15,6,3, { boss:true, aggroR:5, lv:3 }),
+      foe('황건적병','보병', 3,2, 28,11,4,4),
+      foe('황건적병','보병', 7,2, 28,11,4,4),
+      foe('황건적병','보병',10,2, 28,11,4,4),
+      foe('황건적병','보병', 5,3, 28,11,4,4),
+      foe('황건적병','보병', 2,4, 28,11,4,4),
+      foe('황건궁병','궁병', 4,2, 24,11,3,4),
+      foe('황건궁병','궁병', 8,1, 24,11,3,4),
+    ],
+  },
+  {
+    title:'제3장 광종 결전',
+    intro:'드디어 황건적의 수령, 천공장군 장각의 본진에 다다랐다.\n요술을 부리는 장각을 쓰러뜨려 난을 평정하라!',
+    map:[
+      'MMMMMPTTTPMMMM',
+      'MMMPPPTTTPPMMM',
+      'MPPPPPPPPPPPPM',
+      'PPPFFPPPPPFFPP',
+      'PPPPPPPPPPPPPP',
+      'WWWBBWWWWWBBWW',
+      'PPPPPPPPPPPPPP',
+      'PPFFPPPPPPFFPP',
+      'PPPPPPPPPPPPPP',
+      'PPPPPPPPPPPPPP',
+    ],
+    spawns:[[6,8],[5,8],[8,8],[6,9],[4,8]],
+    enemies:() => [
+      foe('장각','요술사', 7,0, 55,18,8,3, { boss:true, aggroR:4, lv:5 }),
+      foe('황건역사','보병', 6,1, 32,13,6,4, { lv:3 }),
+      foe('황건역사','보병', 8,1, 32,13,6,4, { lv:3 }),
+      foe('황건적병','보병', 3,2, 28,11,4,4),
+      foe('황건적병','보병',10,2, 28,11,4,4),
+      foe('황건적병','보병', 4,4, 28,11,4,4),
+      foe('황건적병','보병', 9,4, 28,11,4,4),
+      foe('황건궁병','궁병', 6,3, 26,12,3,4),
+      foe('황건궁병','궁병', 8,3, 26,12,3,4),
+    ],
+  },
+];
+
+/* ---------------- 게임 상태 ---------------- */
+let stageIdx = 0;
+let map = [];          // map[y][x] -> 지형 문자
+let units = [];        // 현재 전장의 모든 유닛
+let turn = 1;
+let phase = 'player';  // 'player' | 'enemy'
+let state = 'idle';    // idle | moveSelect | action | attackSelect | busy | over
+let selected = null;
+let origPos = null;
+let moveTiles = null;  // Map key->cost
+let attackTargets = [];
+let hoverTile = null;
+let popups = [];       // {px,py,text,color,t0}
+let banner = null;     // {text,color,t0}
+let rosterSnapshot = null;
+
+const $ = id => document.getElementById(id);
+const key = (x,y) => y*COLS + x;
+const inB = (x,y) => x>=0 && x<COLS && y>=0 && y<ROWS;
+const terrainAt = (x,y) => TERRAIN[map[y][x]];
+const mdist = (a,b,c,d) => Math.abs(a-c) + Math.abs(b-d);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const aliveUnits = f => units.filter(u => u.alive && (!f || u.faction===f));
+const unitAt = (x,y) => units.find(u => u.alive && u.x===x && u.y===y);
+
+/* ---------------- 로그 ---------------- */
+function log(msg, cls='') {
+  const el = $('log');
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = msg;
+  el.appendChild(d);
+  while (el.children.length > 40) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ---------------- 스테이지 로드 ---------------- */
+function loadStage(idx, retry=false) {
+  stageIdx = idx;
+  const st = STAGES[idx];
+  map = st.map.map(r => r.split(''));
+  if (retry && rosterSnapshot) roster = JSON.parse(JSON.stringify(rosterSnapshot));
+  rosterSnapshot = JSON.parse(JSON.stringify(roster));
+
+  units = [];
+  let s = 0;
+  for (const h of roster) {
+    if (h.joined > idx+1) continue;
+    h.alive = true; h.acted = false; h.hp = h.maxHp;
+    const [sx,sy] = st.spawns[s++];
+    h.x = sx; h.y = sy; h.rx = sx; h.ry = sy;
+    units.push(h);
+  }
+  units.push(...st.enemies());
+
+  turn = 1; phase = 'player'; state = 'idle';
+  selected = null; moveTiles = null; attackTargets = []; popups = [];
+  $('log').innerHTML = '';
+  if (roster[4].joined === idx+1 && idx+1 === 2) log('조운이 아군에 합류했다!', 'important');
+  log(`― ${st.title} ―`, 'important');
+  showBanner(st.title, '#e3b341');
+  updateTurnInfo();
+  updateEndBtn();
+}
+
+/* ---------------- 이동 범위 (다익스트라) ---------------- */
+function moveRange(u) {
+  const cls = CLASSES[u.cls];
+  const dist = new Map([[key(u.x,u.y), 0]]);
+  const pq = [{x:u.x, y:u.y, c:0}];
+  while (pq.length) {
+    pq.sort((a,b)=>a.c-b.c);
+    const cur = pq.shift();
+    if (cur.c > dist.get(key(cur.x,cur.y))) continue;
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = cur.x+dx, ny = cur.y+dy;
+      if (!inB(nx,ny)) continue;
+      const cost = cls.cost[map[ny][nx]];
+      if (cost === undefined) continue;                       // 통행 불가 지형
+      const occ = unitAt(nx,ny);
+      if (occ && occ.faction !== u.faction) continue;         // 적군 통과 불가
+      const nc = cur.c + cost;
+      if (nc > u.mov) continue;
+      const k = key(nx,ny);
+      if (nc < (dist.get(k) ?? Infinity)) { dist.set(k,nc); pq.push({x:nx,y:ny,c:nc}); }
+    }
+  }
+  return dist;
+}
+function canStop(u,x,y) {
+  const occ = unitAt(x,y);
+  return !occ || occ === u;
+}
+function targetsFrom(u, x, y) {
+  const cls = CLASSES[u.cls];
+  return aliveUnits().filter(t =>
+    t.faction !== u.faction &&
+    mdist(x,y,t.x,t.y) >= cls.minR && mdist(x,y,t.x,t.y) <= cls.maxR);
+}
+
+/* ---------------- 전투 ---------------- */
+function calcDamage(att, def) {
+  const cls = CLASSES[att.cls];
+  const tDef = TERRAIN[map[def.y][def.x]].def;
+  let dmg;
+  if (cls.magic) dmg = att.atk - Math.floor(def.def/2);       // 요술은 지형 무시, 방어 절반
+  else           dmg = att.atk - def.def - tDef;
+  dmg += Math.floor(Math.random()*4);
+  const crit = Math.random() < 0.12;
+  if (crit) dmg = Math.floor(dmg * 1.5);
+  return { dmg: Math.max(1, dmg), crit };
+}
+function addPopup(u, text, color) {
+  popups.push({ px:u.rx*TS+TS/2, py:u.ry*TS, text, color, t0:performance.now() });
+}
+function gainExp(hero, amount) {
+  if (hero.faction !== 'player' || !hero.alive) return;
+  hero.exp += amount;
+  while (hero.exp >= 100) {
+    hero.exp -= 100;
+    hero.level++;
+    hero.maxHp += 4; hero.hp = Math.min(hero.maxHp, hero.hp+4);
+    hero.atk += 2; hero.def += 1;
+    addPopup(hero, 'LEVEL UP!', '#ffe27a');
+    log(`✨ ${hero.name} 레벨 ${hero.level} 달성! (공+2 방+1 체+4)`, 'important');
+  }
+}
+function applyHit(att, def) {
+  const { dmg, crit } = calcDamage(att, def);
+  def.hp = Math.max(0, def.hp - dmg);
+  addPopup(def, (crit?'필살! ':'') + dmg, crit ? '#ffd24a' : '#ff7a6a');
+  log(`${att.name} → ${def.name}에게 ${dmg} 피해${crit?' (필살!)':''}`, 'dmg');
+  gainExp(att, Math.min(50, dmg));
+  if (def.hp <= 0) {
+    def.alive = false;
+    if (def.faction === 'player') {
+      addPopup(def, '퇴각', '#aaa');
+      log(`💔 ${def.name} 퇴각!`, 'important');
+    } else {
+      addPopup(def, '💀', '#fff');
+      log(`☠️ ${def.name} 격파!`, 'important');
+      gainExp(att, def.boss ? 80 : 40);
+    }
+  }
+}
+async function performAttack(att, def) {
+  state = 'busy';
+  updateEndBtn();
+  applyHit(att, def);
+  await sleep(550);
+  // 반격
+  if (def.alive && att.alive) {
+    const cls = CLASSES[def.cls];
+    const d = mdist(att.x,att.y,def.x,def.y);
+    if (d >= cls.minR && d <= cls.maxR) {
+      applyHit(def, att);
+      await sleep(550);
+    }
+  }
+}
+
+/* ---------------- 승패 판정 ---------------- */
+function checkBattleEnd() {
+  const leader = roster[0];
+  if (!leader.alive) { gameOver(false, '총대장 유비가 퇴각했다...\n의병은 뿔뿔이 흩어지고 말았다.'); return true; }
+  if (aliveUnits('player').length === 0) { gameOver(false, '아군이 전멸했다...'); return true; }
+  if (aliveUnits('enemy').length === 0) {
+    if (stageIdx + 1 >= STAGES.length) {
+      gameOver(true,
+        '장각이 쓰러지고 황건적의 난은 평정되었다!\n\n유비 삼형제의 이름은 천하에 떨쳐지니,\n이것이 훗날 펼쳐질 대서사의 서막이었다——\n\n— 完 —');
+    } else {
+      stageClear();
+    }
+    return true;
+  }
+  return false;
+}
+
+/* ---------------- 적 AI ---------------- */
+function distFieldFromPlayers() {
+  // 아군 위치들로부터의 다중 시작 BFS (보병 기준 통행 가능 지형)
+  const field = new Array(COLS*ROWS).fill(Infinity);
+  const q = [];
+  for (const p of aliveUnits('player')) { field[key(p.x,p.y)] = 0; q.push([p.x,p.y]); }
+  while (q.length) {
+    const [cx,cy] = q.shift();
+    const d = field[key(cx,cy)];
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = cx+dx, ny = cy+dy;
+      if (!inB(nx,ny)) continue;
+      if (CLASSES['보병'].cost[map[ny][nx]] === undefined) continue;
+      if (field[key(nx,ny)] > d+1) { field[key(nx,ny)] = d+1; q.push([nx,ny]); }
+    }
+  }
+  return field;
+}
+async function enemyTurn() {
+  phase = 'enemy'; state = 'busy';
+  hideMenu(); selected = null; moveTiles = null; attackTargets = [];
+  updateTurnInfo(); updateEndBtn();
+  showBanner('적군 차례', '#ff8a7a');
+  await sleep(900);
+
+  for (const e of aliveUnits('enemy')) {
+    if (!e.alive) continue;
+    const nearDist = Math.min(...aliveUnits('player').map(p => mdist(e.x,e.y,p.x,p.y)));
+    const aggro = e.hp < e.maxHp || nearDist <= e.aggroR || turn >= 6;
+
+    const range = moveRange(e);
+    // 1) 이동 후 공격 가능한 후보 탐색
+    let best = null;
+    for (const [k] of range) {
+      const tx = k % COLS, ty = Math.floor(k / COLS);
+      if (!canStop(e,tx,ty)) continue;
+      for (const t of targetsFrom(e, tx, ty)) {
+        const { dmg } = calcDamage(e, t);
+        let score = dmg + TERRAIN[map[ty][tx]].def * 2;
+        if (dmg >= t.hp) score += 100;
+        if (t.leader) score += 15;
+        if (!best || score > best.score) best = { tx, ty, t, score };
+      }
+    }
+    if (best) {
+      e.x = best.tx; e.y = best.ty;
+      await waitArrive(e);
+      await performAttack(e, best.t);
+      e.acted = true;
+      if (checkBattleEnd()) return;
+      await sleep(250);
+      continue;
+    }
+    // 2) 공격 불가 → 가까운 아군 쪽으로 전진 (어그로 시)
+    if (aggro) {
+      const field = distFieldFromPlayers();
+      let mv = null;
+      for (const [k] of range) {
+        const tx = k % COLS, ty = Math.floor(k / COLS);
+        if (!canStop(e,tx,ty)) continue;
+        const d = field[k];
+        if (!mv || d < mv.d) mv = { tx, ty, d };
+      }
+      if (mv && mv.d < field[key(e.x,e.y)]) {
+        e.x = mv.tx; e.y = mv.ty;
+        await waitArrive(e);
+        await sleep(120);
+      }
+    }
+    e.acted = true;
+  }
+  // 아군 차례 시작
+  turn++;
+  phase = 'player'; state = 'idle';
+  for (const u of units) u.acted = false;
+  // 성채 회복
+  for (const u of aliveUnits()) {
+    if (map[u.y][u.x] === 'T' && u.hp < u.maxHp) {
+      const heal = Math.min(8, u.maxHp - u.hp);
+      u.hp += heal;
+      addPopup(u, '+'+heal, '#8ae09a');
+      log(`${u.name} 성채에서 ${heal} 회복`, 'heal');
+    }
+  }
+  updateTurnInfo(); updateEndBtn();
+  showBanner(`${turn}턴 - 아군 차례`, '#7ab8ff');
+}
+function waitArrive(u) {
+  return new Promise(res => {
+    const chk = () => {
+      if (Math.abs(u.rx-u.x) < .02 && Math.abs(u.ry-u.y) < .02) res();
+      else requestAnimationFrame(chk);
+    };
+    chk();
+  });
+}
+
+/* ---------------- 입력 처리 ---------------- */
+function canvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) * (canvas.width / r.width) / TS);
+  const y = Math.floor((e.clientY - r.top) * (canvas.height / r.height) / TS);
+  return { x, y };
+}
+canvas.addEventListener('mousemove', e => {
+  const { x, y } = canvasPos(e);
+  hoverTile = inB(x,y) ? { x, y } : null;
+  updateSidebar();
+});
+canvas.addEventListener('contextmenu', e => { e.preventDefault(); cancelAction(); });
+canvas.addEventListener('click', e => {
+  const { x, y } = canvasPos(e);
+  if (!inB(x,y)) return;
+  if (phase !== 'player') return;
+
+  if (state === 'idle') {
+    const u = unitAt(x,y);
+    if (u && u.faction === 'player' && !u.acted) {
+      selected = u;
+      origPos = { x:u.x, y:u.y };
+      moveTiles = moveRange(u);
+      state = 'moveSelect';
+    } else if (u) {
+      selected = null; hoverTile = { x, y };
+    }
+    updateSidebar();
+    return;
+  }
+  if (state === 'moveSelect') {
+    const u = unitAt(x,y);
+    if (u && u.faction === 'player' && !u.acted && u !== selected) {
+      selected = u; origPos = { x:u.x, y:u.y };
+      moveTiles = moveRange(u);
+      updateSidebar();
+      return;
+    }
+    if (moveTiles.has(key(x,y)) && canStop(selected,x,y)) {
+      selected.x = x; selected.y = y;
+      moveTiles = null;
+      state = 'action';
+      waitArrive(selected).then(showMenu);
+    } else {
+      cancelAction();
+    }
+    return;
+  }
+  if (state === 'attackSelect') {
+    const t = unitAt(x,y);
+    if (t && attackTargets.includes(t)) {
+      attackTargets = [];
+      hideMenu();
+      performAttack(selected, t).then(() => {
+        selected.acted = true;
+        finishAction();
+      });
+    } else {
+      state = 'action';
+      attackTargets = [];
+      showMenu();
+    }
+  }
+});
+
+function cancelAction() {
+  if (state === 'moveSelect') {
+    selected = null; moveTiles = null; state = 'idle';
+  } else if (state === 'action' || state === 'attackSelect') {
+    selected.x = origPos.x; selected.y = origPos.y;
+    selected.rx = origPos.x; selected.ry = origPos.y;
+    attackTargets = []; hideMenu();
+    selected = null; state = 'idle';
+  }
+  updateSidebar();
+}
+function finishAction() {
+  selected = null; moveTiles = null; attackTargets = [];
+  state = 'idle';
+  updateSidebar(); updateEndBtn();
+  if (checkBattleEnd()) return;
+  if (aliveUnits('player').every(u => u.acted)) enemyTurn();
+}
+
+/* ---------------- 행동 메뉴 ---------------- */
+function showMenu() {
+  const m = $('actionMenu');
+  const r = canvas.getBoundingClientRect();
+  const sx = r.width / canvas.width, sy = r.height / canvas.height;
+  let left = (selected.x*TS + TS + 6) * sx;
+  let top  = (selected.y*TS - 10) * sy;
+  if (left > r.width - 110) left = (selected.x*TS - TS*2 - 14) * sx;
+  if (top  > r.height - 130) top = r.height - 130;
+  if (top < 0) top = 0;
+  m.style.left = left + 'px';
+  m.style.top  = top + 'px';
+  $('btnAttack').disabled = targetsFrom(selected, selected.x, selected.y).length === 0;
+  m.style.display = 'block';
+}
+function hideMenu() { $('actionMenu').style.display = 'none'; }
+
+$('btnAttack').onclick = () => {
+  attackTargets = targetsFrom(selected, selected.x, selected.y);
+  state = 'attackSelect';
+  hideMenu();
+};
+$('btnWait').onclick = () => {
+  selected.acted = true;
+  hideMenu();
+  finishAction();
+};
+$('btnCancel').onclick = cancelAction;
+
+$('endTurnBtn').onclick = () => {
+  if (phase !== 'player' || state === 'busy' || state === 'over') return;
+  hideMenu();
+  if (state === 'action' || state === 'attackSelect') cancelAction();
+  for (const u of aliveUnits('player')) u.acted = true;
+  enemyTurn();
+};
+
+/* ---------------- UI 갱신 ---------------- */
+function updateTurnInfo() {
+  const ph = phase === 'player'
+    ? '<span class="phase-player">아군 차례</span>'
+    : '<span class="phase-enemy">적군 차례</span>';
+  $('turnInfo').innerHTML = `${STAGES[stageIdx].title.split(' ')[0]} / ${turn}턴 ${ph}`;
+}
+function updateEndBtn() {
+  $('endTurnBtn').disabled = (phase !== 'player' || state === 'busy' || state === 'over');
+}
+function unitCard(u) {
+  const cls = CLASSES[u.cls];
+  const hpPct = Math.round(u.hp/u.maxHp*100);
+  let html = `<div style="font-size:15px;font-weight:bold;color:${u.faction==='player'?'#7ab8ff':'#ff8a7a'}">
+    ${cls.emoji} ${u.name} <span style="font-size:11px;color:#a89878">(${u.cls} Lv.${u.level})</span></div>
+    <div class="hpbarOuter"><div class="hpbarInner" style="width:${hpPct}%"></div></div>
+    <div class="statRow"><span>체력</span><span class="v">${u.hp} / ${u.maxHp}</span></div>
+    <div class="statRow"><span>공격</span><span class="v">${u.atk}</span></div>
+    <div class="statRow"><span>방어</span><span class="v">${u.def}</span></div>
+    <div class="statRow"><span>이동</span><span class="v">${u.mov}</span></div>
+    <div class="statRow"><span>사거리</span><span class="v">${cls.minR===cls.maxR?cls.maxR:cls.minR+'~'+cls.maxR}</span></div>`;
+  if (u.faction === 'player') {
+    html += `<div class="statRow"><span>경험치</span><span class="v">${u.exp} / 100</span></div>
+      <div class="hpbarOuter"><div class="expbarInner" style="width:${u.exp}%"></div></div>`;
+  }
+  return html;
+}
+function updateSidebar() {
+  const u = selected || (hoverTile && unitAt(hoverTile.x, hoverTile.y));
+  $('unitInfo').innerHTML = u ? unitCard(u)
+    : '<span class="hint">유닛 위에 마우스를 올리거나 클릭하세요.</span>';
+  if (hoverTile) {
+    const t = terrainAt(hoverTile.x, hoverTile.y);
+    $('tileInfo').innerHTML =
+      `${t.emoji||'🌾'} <b>${t.name}</b> &nbsp; 방어 보정 +${t.def}` +
+      (map[hoverTile.y][hoverTile.x]==='T' ? ' · 매 턴 8 회복' : '') +
+      (map[hoverTile.y][hoverTile.x]==='W' ? ' · 통행 불가' : '');
+  } else {
+    $('tileInfo').innerHTML = '<span class="hint">-</span>';
+  }
+}
+
+/* ---------------- 배너 / 오버레이 ---------------- */
+function showBanner(text, color) { banner = { text, color, t0:performance.now() }; }
+function showOverlay(title, sub, body, btnText, onClick) {
+  $('overlay').style.display = 'flex';
+  const box = $('overlayBox');
+  box.querySelector('h2').textContent = title;
+  box.querySelector('h3').textContent = sub;
+  box.querySelector('p').textContent = body;
+  const btn = $('overlayBtn');
+  btn.textContent = btnText;
+  btn.onclick = () => { $('overlay').style.display = 'none'; onClick(); };
+}
+function stageClear() {
+  state = 'over'; updateEndBtn();
+  const next = stageIdx + 1;
+  showOverlay('勝 利', STAGES[stageIdx].title + ' 클리어!',
+    '아군은 부상을 회복하고 다음 싸움터로 향한다.\n\n' + STAGES[next].intro,
+    '진군!', () => loadStage(next));
+}
+function gameOver(win, body) {
+  state = 'over'; updateEndBtn();
+  if (win) {
+    showOverlay('天下平定', '황건적의 난 평정!', body, '처음부터', () => {
+      buildRoster();
+      loadStage(0);
+    });
+  } else {
+    showOverlay('敗 北', '아군 궤멸...', body, '다시 도전', () => loadStage(stageIdx, true));
+  }
+}
+
+/* ---------------- 렌더링 ---------------- */
+function drawTile(x, y) {
+  const t = TERRAIN[map[y][x]];
+  ctx.fillStyle = t.color;
+  ctx.fillRect(x*TS, y*TS, TS, TS);
+  // 평지 풀 질감
+  if (map[y][x] === 'P' && (x*7 + y*13) % 5 === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    ctx.fillRect(x*TS+8, y*TS+8, 4, 4);
+  }
+  if (map[y][x] === 'B') {
+    ctx.strokeStyle = 'rgba(60,40,15,.5)';
+    for (let i=1;i<4;i++){ ctx.beginPath(); ctx.moveTo(x*TS, y*TS+i*12); ctx.lineTo(x*TS+TS, y*TS+i*12); ctx.stroke(); }
+  }
+  if (t.emoji) {
+    ctx.font = '22px serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(t.emoji, x*TS+TS/2, y*TS+TS/2+1);
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,.12)';
+  ctx.strokeRect(x*TS+.5, y*TS+.5, TS-1, TS-1);
+}
+function drawUnit(u, now) {
+  // 위치 보간
+  u.rx += (u.x - u.rx) * 0.25;
+  u.ry += (u.y - u.ry) * 0.25;
+  if (Math.abs(u.x-u.rx) < .01) u.rx = u.x;
+  if (Math.abs(u.y-u.ry) < .01) u.ry = u.y;
+
+  const cx = u.rx*TS + TS/2, cy = u.ry*TS + TS/2;
+  const isP = u.faction === 'player';
+  const r = u.boss ? 19 : 17;
+
+  // 선택/타겟 링
+  if (u === selected) {
+    const pulse = 2 + Math.sin(now/180)*2;
+    ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, r+3+pulse, 0, Math.PI*2); ctx.stroke();
+  }
+  if (attackTargets.includes(u)) {
+    const pulse = 2 + Math.sin(now/140)*2;
+    ctx.strokeStyle = '#ff4a3a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, r+3+pulse, 0, Math.PI*2); ctx.stroke();
+  }
+
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.fillStyle = isP ? '#2b6cb0' : (u.boss ? '#8a2070' : '#b03030');
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = u.acted && isP ? '#555' : '#fff';
+  ctx.stroke();
+  if (u.acted && isP && phase === 'player') {
+    ctx.fillStyle = 'rgba(40,40,40,.45)';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+  }
+
+  ctx.font = (u.boss?'20px':'18px') + ' serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(CLASSES[u.cls].emoji, cx, cy+1);
+
+  // 이름
+  ctx.font = 'bold 10px sans-serif';
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
+  ctx.strokeText(u.name, cx, cy + r + 9);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(u.name, cx, cy + r + 9);
+
+  // HP 바
+  const bw = 34, bx = cx - bw/2, by = cy - r - 9;
+  ctx.fillStyle = 'rgba(0,0,0,.65)';
+  ctx.fillRect(bx-1, by-1, bw+2, 6);
+  const pct = u.hp / u.maxHp;
+  ctx.fillStyle = pct > .5 ? '#4ad04a' : pct > .25 ? '#e8c84a' : '#e84a3a';
+  ctx.fillRect(bx, by, bw*pct, 4);
+}
+function render(now) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) drawTile(x, y);
+
+  // 이동 범위 하이라이트
+  if (state === 'moveSelect' && moveTiles) {
+    for (const [k] of moveTiles) {
+      const x = k % COLS, y = Math.floor(k / COLS);
+      if (!canStop(selected,x,y)) continue;
+      ctx.fillStyle = 'rgba(80,150,255,.38)';
+      ctx.fillRect(x*TS+2, y*TS+2, TS-4, TS-4);
+    }
+  }
+  // 공격 사거리 표시
+  if (state === 'attackSelect' && selected) {
+    const cls = CLASSES[selected.cls];
+    for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
+      const d = mdist(selected.x, selected.y, x, y);
+      if (d >= cls.minR && d <= cls.maxR) {
+        ctx.fillStyle = 'rgba(255,70,50,.30)';
+        ctx.fillRect(x*TS+2, y*TS+2, TS-4, TS-4);
+      }
+    }
+  }
+  // 호버 커서
+  if (hoverTile && phase === 'player') {
+    ctx.strokeStyle = 'rgba(255,255,200,.7)'; ctx.lineWidth = 2;
+    ctx.strokeRect(hoverTile.x*TS+2, hoverTile.y*TS+2, TS-4, TS-4);
+  }
+
+  // 유닛 (선택된 유닛을 맨 위에)
+  const list = aliveUnits().slice().sort((a,b) => (a===selected)-(b===selected));
+  for (const u of list) drawUnit(u, now);
+
+  // 데미지 팝업
+  popups = popups.filter(p => now - p.t0 < 950);
+  for (const p of popups) {
+    const t = (now - p.t0) / 950;
+    ctx.globalAlpha = 1 - t;
+    ctx.font = 'bold 17px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    ctx.strokeText(p.text, p.px, p.py - t*26);
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, p.px, p.py - t*26);
+    ctx.globalAlpha = 1;
+  }
+
+  // 페이즈 배너
+  if (banner) {
+    const t = (now - banner.t0) / 1400;
+    if (t >= 1) banner = null;
+    else {
+      const a = t < .15 ? t/.15 : t > .75 ? (1-t)/.25 : 1;
+      ctx.globalAlpha = a * .85;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, canvas.height/2-34, canvas.width, 68);
+      ctx.globalAlpha = a;
+      ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = banner.color;
+      ctx.fillText(banner.text, canvas.width/2, canvas.height/2);
+      ctx.globalAlpha = 1;
+    }
+  }
+  requestAnimationFrame(render);
+}
+
+/* ---------------- 시작 ---------------- */
+buildRoster();
+loadStage(0);
+showOverlay('三國志 영걸전', '~ 황건적의 난 ~',
+  '때는 후한 말, 장각이 이끄는 황건적이 천하를 어지럽히니\n유비 · 관우 · 장비 세 사람이 도원에서 의형제를 맺고\n의병을 일으켜 난세에 뛰어드는데——\n\n' + STAGES[0].intro,
+  '출진!', () => {});
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
