@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍎 사과를 가져간 포켓몬 통통이 🍎</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    font-family: 'Jua','Segoe UI',sans-serif;
+    overflow:hidden;
+    background:#0b1026;
+  }
+
+  /* ===== 무대 ===== */
+  #book {
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .page {
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:flex-end;
+    opacity:0; visibility:hidden;
+    transition:opacity .7s ease;
+    overflow:hidden;
+  }
+  .page.active { opacity:1; visibility:visible; z-index:2; }
+
+  /* 하늘 그라데이션 (장면별) */
+  .sky { position:absolute; inset:0; z-index:0; }
+  .sky.day   { background:linear-gradient(180deg,#aee7ff 0%,#d7f4ff 45%,#bde6a0 75%,#8fd16a 100%); }
+  .sky.noon  { background:linear-gradient(180deg,#ffe9a8 0%,#ffd36e 40%,#b9e88a 72%,#84cf63 100%); }
+  .sky.night { background:linear-gradient(180deg,#0b1850 0%,#22306e 45%,#274d3a 78%,#1c3a2a 100%); }
+  .sky.dawn  { background:linear-gradient(180deg,#ffb6c1 0%,#ffd9a0 40%,#cdeea0 75%,#8fd16a 100%); }
+  .sky.warm  { background:linear-gradient(180deg,#ffd6e8 0%,#fff0c9 45%,#cdeea0 78%,#8fd16a 100%); }
+
+  /* 땅 */
+  .ground { position:absolute; bottom:0; left:0; width:100%; height:26%; z-index:1;
+    background:radial-gradient(ellipse at 50% 0,#9be06f,#5fae3d); border-top-left-radius:50% 30px; border-top-right-radius:50% 30px;}
+
+  /* 해/달 */
+  .sun { position:absolute; top:8%; right:10%; width:90px; height:90px; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%,#fff6c0,#ffd23f); box-shadow:0 0 50px 12px rgba(255,210,63,.6); z-index:1; animation:bob 5s ease-in-out infinite;}
+  .moon { position:absolute; top:8%; right:12%; width:74px; height:74px; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%,#ffffff,#dfe6ff); box-shadow:0 0 40px 10px rgba(200,210,255,.5); z-index:1; animation:bob 6s ease-in-out infinite;}
+
+  .cloud { position:absolute; z-index:1; font-size:60px; opacity:.92; animation:drift 22s linear infinite;}
+  @keyframes drift { from{transform:translateX(-20vw);} to{transform:translateX(120vw);} }
+
+  /* 별 */
+  .star { position:absolute; width:4px; height:4px; background:#fff; border-radius:50%; z-index:1; animation:tw 2.5s ease-in-out infinite;}
+  @keyframes tw { 0%,100%{opacity:.25; transform:scale(.7);} 50%{opacity:1; transform:scale(1.3);} }
+
+  /* ===== 나무 ===== */
+  .tree { position:absolute; bottom:18%; z-index:2; transform-origin:bottom center; animation:sway 4s ease-in-out infinite;}
+  @keyframes sway { 0%,100%{transform:rotate(-1.5deg);} 50%{transform:rotate(1.5deg);} }
+  .trunk { width:46px; height:120px; margin:0 auto; background:linear-gradient(90deg,#7a4a22,#a06a34,#7a4a22); border-radius:12px;}
+  .leaves { position:relative; width:230px; height:200px; margin-bottom:-30px;}
+  .leaf-blob { position:absolute; border-radius:50%; background:radial-gradient(circle at 35% 30%,#7cd860,#3f9e34);}
+  .lb1{ width:150px; height:150px; left:40px; top:30px;}
+  .lb2{ width:120px; height:120px; left:0;   top:60px;}
+  .lb3{ width:120px; height:120px; right:0;  top:60px;}
+  .lb4{ width:120px; height:120px; left:55px; top:0;}
+  .apple { position:absolute; width:26px; height:28px; background:radial-gradient(circle at 35% 30%,#ff8a8a,#e03131); border-radius:50% 50% 48% 48%; z-index:3; box-shadow:inset -3px -4px 4px rgba(0,0,0,.18);}
+  .apple::before{ content:""; position:absolute; top:-6px; left:11px; width:4px; height:8px; background:#6b4324; border-radius:2px; transform:rotate(12deg);}
+  .apple::after{ content:""; position:absolute; top:-7px; left:14px; width:10px; height:7px; background:#4caf50; border-radius:60% 0 60% 0; transform:rotate(20deg);}
+  .apple.fall { animation:fall 1.4s ease-in forwards;}
+  @keyframes fall { 0%{transform:translateY(0) rotate(0);} 60%{transform:translateY(160px) rotate(180deg);} 75%{transform:translateY(140px);} 100%{transform:translateY(160px) rotate(200deg);} }
+
+  /* ===== 통통이 (사과 포켓몬) ===== */
+  .mon { position:relative; width:160px; height:170px; z-index:5; animation:hop 1.8s ease-in-out infinite;}
+  @keyframes hop { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-14px);} }
+  .mon .body { position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+    width:140px; height:128px; background:radial-gradient(circle at 38% 30%,#ff9d3c,#f0641e);
+    border-radius:50% 50% 46% 46%; box-shadow:inset -8px -10px 12px rgba(0,0,0,.15);}
+  .mon .stem { position:absolute; top:-2px; left:50%; transform:translateX(-50%); width:8px; height:20px; background:#6b4324; border-radius:4px; z-index:6;}
+  .mon .lf { position:absolute; top:-6px; left:54%; width:34px; height:22px; background:radial-gradient(circle at 30% 30%,#86e06a,#3f9e34); border-radius:70% 0 70% 0; z-index:6; transform-origin:left center; animation:leafw 2.5s ease-in-out infinite;}
+  @keyframes leafw { 0%,100%{transform:rotate(8deg);} 50%{transform:rotate(-6deg);} }
+  .mon .eye { position:absolute; top:54px; width:26px; height:30px; background:#fff; border-radius:50%; z-index:7; box-shadow:0 1px 2px rgba(0,0,0,.15);}
+  .mon .eye.l{ left:38px;} .mon .eye.r{ right:38px;}
+  .mon .pupil { position:absolute; top:8px; left:7px; width:13px; height:15px; background:#2a1a10; border-radius:50%; animation:blink 4s infinite;}
+  .mon .pupil::after{ content:""; position:absolute; top:2px; left:2px; width:5px; height:5px; background:#fff; border-radius:50%;}
+  @keyframes blink { 0%,92%,100%{transform:scaleY(1);} 96%{transform:scaleY(.1);} }
+  .mon .cheek { position:absolute; top:80px; width:18px; height:11px; background:#ff6b6b; opacity:.55; border-radius:50%; z-index:7;}
+  .mon .cheek.l{ left:26px;} .mon .cheek.r{ right:26px;}
+  .mon .mouth { position:absolute; top:84px; left:50%; transform:translateX(-50%); width:26px; height:16px; border-bottom-left-radius:26px; border-bottom-right-radius:26px; background:#7a2b14; z-index:7;}
+  .mon .arm { position:absolute; top:78px; width:30px; height:18px; background:#f0641e; border-radius:50%; z-index:6; animation:wave 1.5s ease-in-out infinite;}
+  .mon .arm.l{ left:-6px; transform-origin:right center;} .mon .arm.r{ right:-6px; transform-origin:left center;}
+  @keyframes wave { 0%,100%{transform:rotate(0);} 50%{transform:rotate(-22deg);} }
+  /* 표정 변형 */
+  .mon.sad .mouth { height:10px; border-radius:26px 26px 0 0; top:92px; background:none; border-top:4px solid #7a2b14;}
+  .mon.sad .lf { animation:none; transform:rotate(40deg); opacity:.7;}
+  .mon.sad { animation:tremble 2.2s ease-in-out infinite;}
+  @keyframes tremble { 0%,100%{transform:translateY(0) rotate(-1deg);} 50%{transform:translateY(0) rotate(1deg);} }
+  .mon.sad .tear { position:absolute; top:80px; width:9px; height:14px; background:#9fe3ff; border-radius:50% 50% 50% 50%/60% 60% 40% 40%; z-index:8; animation:teardrop 1.6s ease-in infinite;}
+  .mon.sad .tear.l{ left:40px;} .mon.sad .tear.r{ right:40px; animation-delay:.6s;}
+  @keyframes teardrop { 0%{transform:translateY(0); opacity:0;} 20%{opacity:1;} 100%{transform:translateY(48px); opacity:0;} }
+  .mon.happy .mouth { width:34px; height:20px; background:#7a2b14;}
+
+  /* 농부 할아버지 */
+  .farmer { position:relative; width:120px; height:170px; z-index:5;}
+  .farmer .hat { position:absolute; top:0; left:50%; transform:translateX(-50%); width:78px; height:26px; background:#caa24a; border-radius:50%; z-index:7;}
+  .farmer .hat::before{ content:""; position:absolute; top:-18px; left:19px; width:40px; height:26px; background:#caa24a; border-radius:50% 50% 0 0;}
+  .farmer .head { position:absolute; top:18px; left:50%; transform:translateX(-50%); width:56px; height:56px; background:#ffd9b0; border-radius:50%; z-index:6;}
+  .farmer .head .ey { position:absolute; top:24px; width:7px; height:7px; background:#2a1a10; border-radius:50%;}
+  .farmer .head .ey.l{ left:14px;} .farmer .head .ey.r{ right:14px;}
+  .farmer .head .beard{ position:absolute; bottom:-6px; left:8px; width:40px; height:24px; background:#f2f2f2; border-radius:0 0 50% 50%;}
+  .farmer .body { position:absolute; top:64px; left:50%; transform:translateX(-50%); width:74px; height:88px; background:linear-gradient(180deg,#4a8ad6,#3a6db0); border-radius:30px 30px 18px 18px; z-index:5;}
+  .farmer.glad { animation:hop 1.8s ease-in-out infinite;}
+
+  /* 친구 포켓몬들 (작은) */
+  .mini { position:relative; width:70px; height:74px; z-index:4; animation:hop 2s ease-in-out infinite;}
+  .mini .b{ position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:60px; height:56px; border-radius:50% 50% 46% 46%;}
+  .mini.blue .b{ background:radial-gradient(circle at 38% 30%,#7fc8ff,#3a86d6);}
+  .mini.pink .b{ background:radial-gradient(circle at 38% 30%,#ffb3d1,#ff6fa5);}
+  .mini .e{ position:absolute; top:24px; width:12px; height:14px; background:#fff; border-radius:50%;}
+  .mini .e.l{ left:16px;} .mini .e.r{ right:16px;}
+  .mini .e::after{ content:""; position:absolute; top:3px; left:3px; width:6px; height:7px; background:#2a1a10; border-radius:50%;}
+
+  /* 사과 바구니 */
+  .basket { position:relative; width:120px; height:70px; z-index:4;}
+  .basket .pail { position:absolute; bottom:0; width:120px; height:54px; background:linear-gradient(180deg,#c98a4a,#9b6328); border-radius:0 0 16px 16px; clip-path:polygon(8% 0,92% 0,100% 100%,0 100%);}
+  .basket .ap { position:absolute; width:24px; height:26px; background:radial-gradient(circle at 35% 30%,#ff8a8a,#e03131); border-radius:50%;}
+
+  /* ===== 글상자 ===== */
+  .textbox {
+    position:relative; z-index:9;
+    width:min(880px,92%);
+    margin-bottom:max(18px,env(safe-area-inset-bottom));
+    background:rgba(255,255,255,.92);
+    border:4px solid #ffce54; border-radius:24px;
+    padding:18px 24px; text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+    backdrop-filter:blur(2px);
+    animation:pop .5s ease;
+  }
+  @keyframes pop { from{transform:translateY(14px) scale(.96); opacity:0;} to{transform:none; opacity:1;} }
+  .textbox p { font-size:clamp(1.15rem,3.4vw,1.7rem); color:#3a2a12; line-height:1.6; word-break:keep-all;}
+  .textbox .who { display:inline-block; font-size:clamp(.95rem,2.6vw,1.15rem); color:#fff; background:#ff8c42; padding:2px 14px; border-radius:14px; margin-bottom:8px;}
+
+  /* ===== 표지 ===== */
+  #cover .title { z-index:9; text-align:center; margin-bottom:auto; margin-top:14vh;}
+  #cover h1 { font-size:clamp(2rem,8vw,4.4rem); color:#fff; text-shadow:3px 4px 0 #e0531c,6px 8px 14px rgba(0,0,0,.25); line-height:1.25;}
+  #cover .sub { font-size:clamp(1rem,3.6vw,1.6rem); color:#7a2b14; background:#fff3c4; display:inline-block; padding:6px 20px; border-radius:20px; margin-top:14px; box-shadow:0 4px 0 #e6c45a;}
+  #cover .tap { color:#fff; font-size:clamp(1rem,3vw,1.3rem); margin-bottom:28px; z-index:9; animation:pulse 1.4s ease-in-out infinite;}
+  @keyframes pulse { 0%,100%{opacity:.5; transform:scale(1);} 50%{opacity:1; transform:scale(1.08);} }
+
+  /* 떨어지는 사과 데코 (표지) */
+  .deco-apple { position:absolute; top:-40px; font-size:34px; z-index:3; animation:rain linear infinite;}
+  @keyframes rain { to{ transform:translateY(108vh) rotate(360deg);} }
+
+  /* ===== 조작 UI ===== */
+  #ui { position:fixed; top:0; left:0; width:100%; z-index:30; display:flex; justify-content:space-between; align-items:center; padding:12px 16px; pointer-events:none;}
+  #ui .right { display:flex; gap:8px; pointer-events:auto;}
+  .btn { pointer-events:auto; cursor:pointer; border:none; border-radius:50px; font-family:inherit;
+    background:rgba(255,255,255,.85); color:#7a2b14; font-size:1rem; padding:10px 16px; box-shadow:0 3px 8px rgba(0,0,0,.2); transition:transform .15s;}
+  .btn:active { transform:scale(.92);}
+  .nav { position:fixed; bottom:0; left:0; width:100%; z-index:30; display:flex; justify-content:space-between; align-items:center; padding:0 10px; pointer-events:none;}
+  .nav .arrow { pointer-events:auto; cursor:pointer; border:none; width:62px; height:62px; border-radius:50%;
+    background:rgba(255,140,66,.92); color:#fff; font-size:1.8rem; box-shadow:0 4px 12px rgba(0,0,0,.3); transition:transform .15s; margin-bottom:16px;}
+  .nav .arrow:active { transform:scale(.88);}
+  .nav .arrow:disabled { opacity:.25; cursor:default;}
+  #dots { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:30; display:flex; gap:7px;}
+  #dots .dot { width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.55);}
+  #dots .dot.on { background:#ff8c42; transform:scale(1.4);}
+
+  @media (max-width:480px){
+    .mon{ transform:scale(.9);} .tree{ transform:scale(.85);} .textbox{ padding:14px 16px;}
+  }
+</style>
+</head>
+<body>
+<div id="book"></div>
+
+<div id="ui">
+  <button class="btn" id="homeBtn">🏠 처음</button>
+  <div class="right">
+    <button class="btn" id="readBtn">🔊 읽어줘</button>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="arrow" id="prevBtn">‹</button>
+  <button class="arrow" id="nextBtn">›</button>
+</div>
+<div id="dots"></div>
+
+<script>
+/* ====== 동화 데이터 ====== */
+const pages = [
+  { id:"cover" },
+  { sky:"day",  scene:"tree-village",
+    who:"", text:"깊은 숲속 작은 마을에, 빨갛고 달콤한 사과가 주렁주렁 열리는 사과나무가 있었어요." },
+  { sky:"day",  scene:"farmer-tree",
+    who:"농부 할아버지", text:"\"이 사과는 마을 친구들이 다 같이 나눠 먹을 거란다. 정말 소중하지!\"" },
+  { sky:"day",  scene:"mon-hungry",
+    who:"", text:"그때, 사과를 너무너무 좋아하는 포켓몬 '통통이'가 나타났어요. 통통이는 배가 꼬르륵 고팠답니다." },
+  { sky:"night", scene:"mon-steal",
+    who:"통통이", text:"\"우와, 맛있겠다… 한 개만… 아니, 전부 다 가져가야지!\" 통통이는 밤에 몰래 사과를 모두 따 갔어요. 물어보지도 않고요." },
+  { sky:"dawn", scene:"empty-tree",
+    who:"", text:"다음 날 아침, 사과나무는 텅— 비어 있었어요. 사과가 하나도 남지 않았지 뭐예요!" },
+  { sky:"dawn", scene:"sad-everyone",
+    who:"농부 할아버지", text:"\"어? 사과가 다 어디 갔지…?\" 할아버지도, 사과를 기다리던 친구들도 모두 슬퍼졌어요." },
+  { sky:"night", scene:"mon-guilty",
+    who:"통통이", text:"혼자 사과를 잔뜩 먹은 통통이는 배가 아팠어요. 그리고 슬퍼하는 친구들을 보니 마음이 콕콕 아팠답니다." },
+  { sky:"night", scene:"mon-cry",
+    who:"통통이", text:"\"허락도 없이 가져가서… 모두가 슬퍼졌어. 내가 잘못했어.\" 통통이는 눈물이 났어요." },
+  { sky:"dawn", scene:"mon-apolo",
+    who:"통통이", text:"통통이는 용기를 내어 할아버지에게 갔어요. \"할아버지, 물어보지 않고 사과를 가져가서 정말 미안해요.\"" },
+  { sky:"warm", scene:"forgive",
+    who:"농부 할아버지", text:"\"솔직하게 말해 줘서 고맙구나. 다음엔 꼭 먼저 물어보렴. 그럼 기쁘게 나눠 줄 수 있단다.\"" },
+  { sky:"warm", scene:"replant",
+    who:"", text:"통통이는 미안한 마음으로 새 사과나무 씨앗을 심고, 매일매일 물을 주며 정성껏 돌봤어요." },
+  { sky:"warm", scene:"share-happy",
+    who:"모두", text:"가을이 되자 사과가 다시 주렁주렁! 이번엔 모두 함께 나눠 먹으며 까르르 웃었답니다." },
+  { sky:"warm", scene:"lesson",
+    who:"💡 우리 약속", text:"가지고 싶은 게 있을 땐, 먼저 \"빌려줄래?\" 하고 물어보기! 그리고 잘못했을 땐 \"미안해\" 하고 말하기. 그러면 모두가 더 행복해져요. 끝!" }
+];
+
+/* ====== 장면 그리기 ====== */
+function monHTML(mood=""){
+  return `<div class="mon ${mood}">
+    <div class="lf"></div><div class="stem"></div>
+    <div class="body"></div>
+    <div class="arm l"></div><div class="arm r"></div>
+    <div class="eye l"><div class="pupil"></div></div>
+    <div class="eye r"><div class="pupil"></div></div>
+    <div class="cheek l"></div><div class="cheek r"></div>
+    <div class="mouth"></div>
+    ${mood==="sad"?'<div class="tear l"></div><div class="tear r"></div>':""}
+  </div>`;
+}
+function treeHTML(apples=6, falling=false){
+  let ap="";
+  const pos=[[60,70],[150,80],[40,120],[170,120],[100,110],[120,160]];
+  for(let i=0;i<apples;i++){ const [x,y]=pos[i%pos.length];
+    ap+=`<div class="apple ${falling&&i<2?'fall':''}" style="left:${x}px;top:${y}px"></div>`; }
+  return `<div class="tree">
+    <div class="leaves">
+      <div class="leaf-blob lb1"></div><div class="leaf-blob lb2"></div>
+      <div class="leaf-blob lb3"></div><div class="leaf-blob lb4"></div>
+      ${ap}
+    </div><div class="trunk"></div>
+  </div>`;
+}
+function farmerHTML(glad=false){
+  return `<div class="farmer ${glad?'glad':''}">
+    <div class="hat"></div>
+    <div class="head"><div class="ey l"></div><div class="ey r"></div><div class="beard"></div></div>
+    <div class="body"></div>
+  </div>`;
+}
+function miniHTML(color){ return `<div class="mini ${color}"><div class="b"></div><div class="e l"></div><div class="e r"></div></div>`; }
+function basketHTML(){ return `<div class="basket"><div class="pail"></div>
+  <div class="ap" style="left:18px;top:8px"></div><div class="ap" style="left:48px;top:2px"></div>
+  <div class="ap" style="left:78px;top:8px"></div></div>`; }
+
+const rowStyle="display:flex;align-items:flex-end;gap:26px;position:absolute;bottom:21%;z-index:5;width:92%;justify-content:center;";
+
+function sceneHTML(scene){
+  switch(scene){
+    case "tree-village":
+      return treeHTML(6)+`<div style="${rowStyle}left:0">${treeHTML(5)}</div>`;
+    case "farmer-tree":
+      return treeHTML(6)+`<div style="${rowStyle}">${farmerHTML()}${basketHTML()}</div>`;
+    case "mon-hungry":
+      return treeHTML(6)+`<div style="${rowStyle}">${monHTML()}</div>`;
+    case "mon-steal":
+      return treeHTML(2,true)+`<div style="${rowStyle}">${monHTML()}${basketHTML()}</div>`;
+    case "empty-tree":
+      return treeHTML(0)+`<div style="${rowStyle}font-size:40px;color:#7a2b14">😮</div>`;
+    case "sad-everyone":
+      return treeHTML(0)+`<div style="${rowStyle}">${farmerHTML()}${miniHTML('blue')}${miniHTML('pink')}</div>`;
+    case "mon-guilty":
+      return `<div style="${rowStyle}">${monHTML('sad')}${basketHTML()}</div>`;
+    case "mon-cry":
+      return `<div style="${rowStyle}">${monHTML('sad')}</div>`;
+    case "mon-apolo":
+      return `<div style="${rowStyle}">${monHTML('sad')}<div style="font-size:32px;align-self:center">🙇</div>${farmerHTML()}</div>`;
+    case "forgive":
+      return `<div style="${rowStyle}">${monHTML()}<div style="font-size:30px;align-self:flex-start">❤️</div>${farmerHTML(true)}</div>`;
+    case "replant":
+      return `<div style="${rowStyle}">${monHTML('happy')}<div style="font-size:38px;align-self:flex-end">🌱💧</div></div>`;
+    case "share-happy":
+      return treeHTML(6)+`<div style="${rowStyle}">${monHTML('happy')}${miniHTML('blue')}${miniHTML('pink')}${farmerHTML(true)}</div>`;
+    case "lesson":
+      return `<div style="${rowStyle}flex-wrap:wrap">${monHTML('happy')}<div style="font-size:46px;align-self:center">🤝🍎</div>${farmerHTML(true)}</div>`;
+    default: return "";
+  }
+}
+
+/* ====== 페이지 빌드 ====== */
+const book=document.getElementById('book');
+pages.forEach((p,i)=>{
+  const el=document.createElement('div');
+  el.className='page'; el.dataset.i=i;
+  if(p.id==="cover"){
+    el.id="cover";
+    let deco="";
+    for(let k=0;k<7;k++){ deco+=`<div class="deco-apple" style="left:${5+k*13}%;animation-duration:${5+k%4}s;animation-delay:${k*0.7}s">🍎</div>`; }
+    el.innerHTML=`<div class="sky warm"></div><div class="ground"></div>${deco}
+      <div class="title"><h1>사과를 가져간<br>포켓몬 통통이</h1>
+      <div class="sub">🍎 허락 없이 가져가면 어떻게 될까요? 🍎</div></div>
+      ${treeHTML(6)}
+      <div style="${rowStyle}">${monHTML('happy')}</div>
+      <div class="tap">👆 화면을 톡! 누르면 시작해요</div>`;
+  } else {
+    let sky=`<div class="sky ${p.sky}"></div>`;
+    if(p.sky==="day"||p.sky==="noon"||p.sky==="dawn"||p.sky==="warm"){
+      sky+=`<div class="sun"></div><div class="cloud" style="top:14%;animation-delay:-4s">☁️</div><div class="cloud" style="top:24%;animation-delay:-12s">☁️</div>`;
+    } else {
+      sky+=`<div class="moon"></div>`;
+      for(let s=0;s<26;s++){ sky+=`<div class="star" style="left:${(s*37)%100}%;top:${(s*53)%55}%;animation-delay:${(s%5)*0.4}s"></div>`; }
+    }
+    el.innerHTML=sky+`<div class="ground"></div>${sceneHTML(p.scene)}
+      <div class="textbox">${p.who?`<span class="who">${p.who}</span><br>`:""}<p>${p.text}</p></div>`;
+  }
+  book.appendChild(el);
+});
+
+/* ====== 점(dots) ====== */
+const dots=document.getElementById('dots');
+pages.forEach((_,i)=>{ const d=document.createElement('div'); d.className='dot'; d.dataset.i=i; dots.appendChild(d);});
+
+/* ====== 페이지 전환 ====== */
+let cur=0;
+const pageEls=[...document.querySelectorAll('.page')];
+const prevBtn=document.getElementById('prevBtn'), nextBtn=document.getElementById('nextBtn');
+function show(n){
+  cur=Math.max(0,Math.min(pages.length-1,n));
+  pageEls.forEach((el,i)=>el.classList.toggle('active',i===cur));
+  [...dots.children].forEach((d,i)=>d.classList.toggle('on',i===cur));
+  prevBtn.disabled=cur===0; nextBtn.disabled=cur===pages.length-1;
+  stopRead();
+  if(autoRead) setTimeout(read,400);
+}
+function next(){ if(cur<pages.length-1) show(cur+1); }
+function prev(){ if(cur>0) show(cur-1); }
+
+nextBtn.onclick=e=>{e.stopPropagation();next();};
+prevBtn.onclick=e=>{e.stopPropagation();prev();};
+document.getElementById('homeBtn').onclick=e=>{e.stopPropagation();show(0);};
+book.onclick=()=>next();
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'||e.key===' ')next(); if(e.key==='ArrowLeft')prev();});
+/* 스와이프 */
+let tx=0;
+book.addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});
+book.addEventListener('touchend',e=>{ const dx=e.changedTouches[0].clientX-tx; if(dx<-50)next(); else if(dx>50)prev();},{passive:true});
+
+/* ====== 읽어주기 (한국어 TTS) ====== */
+let autoRead=false;
+const readBtn=document.getElementById('readBtn');
+function pickKoVoice(){ const vs=speechSynthesis.getVoices(); return vs.find(v=>v.lang&&v.lang.toLowerCase().startsWith('ko'))||vs[0]; }
+function read(){
+  const p=pages[cur];
+  let t = p.id==="cover" ? "사과를 가져간 포켓몬 통통이. 화면을 누르면 시작해요." : ((p.who?p.who+". ":"")+p.text);
+  if(!('speechSynthesis' in window))return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t.replace(/["']/g,''));
+  const v=pickKoVoice(); if(v)u.voice=v; u.lang='ko-KR'; u.rate=.95; u.pitch=1.1;
+  speechSynthesis.speak(u);
+}
+function stopRead(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
+readBtn.onclick=e=>{ e.stopPropagation(); autoRead=!autoRead; readBtn.textContent=autoRead?"🔇 그만":"🔊 읽어줘"; if(autoRead)read(); else stopRead(); };
+if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>{}; }
+
+show(0);
+</script>
+</body>
+</html>
